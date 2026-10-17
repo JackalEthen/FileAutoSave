@@ -1,0 +1,156 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="FileAutoSave" Manufacturer="FileAutoSave" Version="0.2.1"
+           UpgradeCode="8D2C4B10-7F3A-4E21-9B77-1A2C3D4E5F60" Scope="perMachine" Codepage="65001">
+
+    <SummaryInformation Description="文件自动保存加载项（Word / Excel / PowerPoint）" />
+    <MajorUpgrade DowngradeErrorMessage="已安装更高版本的 FileAutoSave。" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="FileAutoSave" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramFilesFolder" />
+    <StandardDirectory Id="SystemFolder" />
+
+    <!-- 安装向导：欢迎 → 许可 → 选择目录 → 确认 → 进度 → 完成 -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+    <ui:WixUI Id="WixUI_InstallDir" />
+
+    <Feature Id="Main" Title="FileAutoSave" Level="1">
+      <ComponentGroupRef Id="ProductFiles" />
+      <ComponentGroupRef Id="OfficeAddins64" />
+      <ComponentGroupRef Id="OfficeAddins32" />
+    </Feature>
+
+    <!--
+      程序集装在同一个组件里（而非一个文件一个组件）。对一个自包含的应用目录是可以接受的简化：
+      修复/卸载以整体为单位。
+    -->
+    <ComponentGroup Id="ProductFiles" Directory="INSTALLFOLDER">
+      <Component Id="cmpFiles" Guid="8D2C4B10-0001-4E21-9B77-1A2C3D4E5F61">
+        <File Id="filCore" Source="$(StagingDir)\FileAutoSave.Core.dll" KeyPath="yes" />
+        <File Id="filWord" Source="$(StagingDir)\FileAutoSave.AddIn.Word.dll" />
+        <File Id="filExcel" Source="$(StagingDir)\FileAutoSave.AddIn.Excel.dll" />
+        <File Id="filPpt" Source="$(StagingDir)\FileAutoSave.AddIn.PowerPoint.dll" />
+        <File Id="filNetOffice" Source="$(StagingDir)\NetOffice.dll" />
+        <File Id="filOfficeApi" Source="$(StagingDir)\OfficeApi.dll" />
+        <File Id="filWordApi" Source="$(StagingDir)\WordApi.dll" />
+        <File Id="filExcelApi" Source="$(StagingDir)\ExcelApi.dll" />
+        <File Id="filPptApi" Source="$(StagingDir)\PowerPointApi.dll" />
+        <File Id="filVbideApi" Source="$(StagingDir)\VBIDEApi.dll" />
+        <File Id="filStdole" Source="$(StagingDir)\stdole.dll" />
+        <File Id="filNewtonsoft" Source="$(StagingDir)\Newtonsoft.Json.dll" />
+        <File Id="filAwsCore" Source="$(StagingDir)\AWSSDK.Core.dll" />
+        <File Id="filAwsS3" Source="$(StagingDir)\AWSSDK.S3.dll" />
+        <File Id="filBclAsync" Source="$(StagingDir)\Microsoft.Bcl.AsyncInterfaces.dll" />
+        <File Id="filSysBuffers" Source="$(StagingDir)\System.Buffers.dll" />
+        <File Id="filSysMemory" Source="$(StagingDir)\System.Memory.dll" />
+        <File Id="filSysNumerics" Source="$(StagingDir)\System.Numerics.Vectors.dll" />
+        <File Id="filSysUnsafe" Source="$(StagingDir)\System.Runtime.CompilerServices.Unsafe.dll" />
+        <File Id="filSysEncWeb" Source="$(StagingDir)\System.Text.Encodings.Web.dll" />
+        <File Id="filSysTextJson" Source="$(StagingDir)\System.Text.Json.dll" />
+        <File Id="filSysTasksExt" Source="$(StagingDir)\System.Threading.Tasks.Extensions.dll" />
+        <File Id="filSysValueTuple" Source="$(StagingDir)\System.ValueTuple.dll" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- 64 位注册表视图（64 位 Office 读这里） -->
+    <ComponentGroup Id="OfficeAddins64" Directory="INSTALLFOLDER">
+      <Component Id="cmpWord64" Guid="8D2C4B10-0010-4E21-9B77-1A2C3D4E5F62">
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Office\Word\Addins\FileAutoSave.AddIn.Word.Connect" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Name="FriendlyName" Value="FileAutoSave" KeyPath="yes" />
+          <RegistryValue Type="string" Name="Description" Value="文件自动保存" />
+          <RegistryValue Type="integer" Name="LoadBehavior" Value="3" />
+        </RegistryKey>
+      </Component>
+      <Component Id="cmpExcel64" Guid="8D2C4B10-0011-4E21-9B77-1A2C3D4E5F63">
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Office\Excel\Addins\FileAutoSave.AddIn.Excel.Connect" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Name="FriendlyName" Value="FileAutoSave" KeyPath="yes" />
+          <RegistryValue Type="string" Name="Description" Value="文件自动保存" />
+          <RegistryValue Type="integer" Name="LoadBehavior" Value="3" />
+        </RegistryKey>
+      </Component>
+      <Component Id="cmpPpt64" Guid="8D2C4B10-0012-4E21-9B77-1A2C3D4E5F64">
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Office\PowerPoint\Addins\FileAutoSave.AddIn.PowerPoint.Connect" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Name="FriendlyName" Value="FileAutoSave" KeyPath="yes" />
+          <RegistryValue Type="string" Name="Description" Value="文件自动保存" />
+          <RegistryValue Type="integer" Name="LoadBehavior" Value="3" />
+        </RegistryKey>
+      </Component>
+    </ComponentGroup>
+
+    <!-- 32 位注册表视图（32 位 Office 读 Wow6432Node）。纯注册表组件，用 32 位目录以免 ICE80。 -->
+    <ComponentGroup Id="OfficeAddins32" Directory="ProgramFilesFolder">
+      <Component Id="cmpWord32" Guid="8D2C4B10-0020-4E21-9B77-1A2C3D4E5F65" Bitness="always32">
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Office\Word\Addins\FileAutoSave.AddIn.Word.Connect" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Name="FriendlyName" Value="FileAutoSave" KeyPath="yes" />
+          <RegistryValue Type="string" Name="Description" Value="文件自动保存" />
+          <RegistryValue Type="integer" Name="LoadBehavior" Value="3" />
+        </RegistryKey>
+      </Component>
+      <Component Id="cmpExcel32" Guid="8D2C4B10-0021-4E21-9B77-1A2C3D4E5F66" Bitness="always32">
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Office\Excel\Addins\FileAutoSave.AddIn.Excel.Connect" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Name="FriendlyName" Value="FileAutoSave" KeyPath="yes" />
+          <RegistryValue Type="string" Name="Description" Value="文件自动保存" />
+          <RegistryValue Type="integer" Name="LoadBehavior" Value="3" />
+        </RegistryKey>
+      </Component>
+      <Component Id="cmpPpt32" Guid="8D2C4B10-0022-4E21-9B77-1A2C3D4E5F67" Bitness="always32">
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Office\PowerPoint\Addins\FileAutoSave.AddIn.PowerPoint.Connect" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Name="FriendlyName" Value="FileAutoSave" KeyPath="yes" />
+          <RegistryValue Type="string" Name="Description" Value="文件自动保存" />
+          <RegistryValue Type="integer" Name="LoadBehavior" Value="3" />
+        </RegistryKey>
+      </Component>
+    </ComponentGroup>
+
+    <!--
+      COM 注册用 RegAsm 而非 WiX 的 <Class>：<Class> 会把 InprocServer32 指向 DLL 本体（原生 COM 语义），
+      托管程序集需要的是 mscoree.dll + Assembly/Class/RuntimeVersion。RegAsm 会正确写这两套（32/64 各一次）。
+      直接把 RegAsm.exe 当自定义动作的目标（不经过 cmd.exe），安装时不弹命令行窗口。
+    -->
+    <CustomAction Id="RegWord32" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Word.dll&quot; /codebase /nologo" />
+    <CustomAction Id="RegWord64" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Word.dll&quot; /codebase /nologo" />
+    <CustomAction Id="RegExcel32" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Excel.dll&quot; /codebase /nologo" />
+    <CustomAction Id="RegExcel64" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Excel.dll&quot; /codebase /nologo" />
+    <CustomAction Id="RegPpt32" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.PowerPoint.dll&quot; /codebase /nologo" />
+    <CustomAction Id="RegPpt64" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.PowerPoint.dll&quot; /codebase /nologo" />
+
+    <CustomAction Id="UnregWord32" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Word.dll&quot; /unregister /nologo" />
+    <CustomAction Id="UnregWord64" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Word.dll&quot; /unregister /nologo" />
+    <CustomAction Id="UnregExcel32" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Excel.dll&quot; /unregister /nologo" />
+    <CustomAction Id="UnregExcel64" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.Excel.dll&quot; /unregister /nologo" />
+    <CustomAction Id="UnregPpt32" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.PowerPoint.dll&quot; /unregister /nologo" />
+    <CustomAction Id="UnregPpt64" Directory="SystemFolder" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe&quot; &quot;[INSTALLFOLDER]FileAutoSave.AddIn.PowerPoint.dll&quot; /unregister /nologo" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RegWord32" After="InstallFiles" Condition="NOT REMOVE" />
+      <Custom Action="RegWord64" After="RegWord32" Condition="NOT REMOVE" />
+      <Custom Action="RegExcel32" After="RegWord64" Condition="NOT REMOVE" />
+      <Custom Action="RegExcel64" After="RegExcel32" Condition="NOT REMOVE" />
+      <Custom Action="RegPpt32" After="RegExcel64" Condition="NOT REMOVE" />
+      <Custom Action="RegPpt64" After="RegPpt32" Condition="NOT REMOVE" />
+
+      <Custom Action="UnregWord32" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="UnregWord64" After="UnregWord32" Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="UnregExcel32" After="UnregWord64" Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="UnregExcel64" After="UnregExcel32" Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="UnregPpt32" After="UnregExcel64" Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="UnregPpt64" After="UnregPpt32" Condition="REMOVE~=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

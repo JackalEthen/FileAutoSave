@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FileAutoSave.AddIn.Excel/FileAutoSave.AddIn.Excel.csproj" />
+    <Project Path="src/FileAutoSave.AddIn.PowerPoint/FileAutoSave.AddIn.PowerPoint.csproj" />
+    <Project Path="src/FileAutoSave.AddIn.Word/FileAutoSave.AddIn.Word.csproj" />
+    <Project Path="src/FileAutoSave.Core/FileAutoSave.Core.csproj" />
+    <Project Path="src/FileAutoSave.SelfCheck/FileAutoSave.SelfCheck.csproj" />
+  </Folder>
+</Solution>
