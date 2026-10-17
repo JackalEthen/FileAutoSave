@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FileAutoSave.AddIn.Word</RootNamespace>
+    <AssemblyName>FileAutoSave.AddIn.Word</AssemblyName>
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NetOfficeFw.Core" Version="1.9.11" />
+    <PackageReference Include="NetOfficeFw.Office" Version="1.9.11" />
+    <PackageReference Include="NetOfficeFw.Word" Version="1.9.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FileAutoSave.Core\FileAutoSave.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,20 @@
+# 构建产物
+bin/
+obj/
+installer/staging/
+installer/*.msi
+installer/*.wixpdb
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# NuGet
+packages/
+*.nupkg
+
+# 本机/临时
+*.log
+Diagnostics/

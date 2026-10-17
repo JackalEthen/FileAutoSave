@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FileAutoSave.AddIn.Excel</RootNamespace>
+    <AssemblyName>FileAutoSave.AddIn.Excel</AssemblyName>
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FileAutoSave.Core\FileAutoSave.Core.csproj" />
+    <PackageReference Include="NetOfficeFw.Core" Version="1.9.11" />
+    <PackageReference Include="NetOfficeFw.Excel" Version="1.9.11" />
+    <PackageReference Include="NetOfficeFw.Office" Version="1.9.11" />
+  </ItemGroup>
+
+</Project>
