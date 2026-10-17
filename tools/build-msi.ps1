@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $configuration = 'Release'
+$culture = 'zh-CN'
 $installerDir = Join-Path $root 'installer'
 $staging = Join-Path $installerDir 'staging'
 $wxs = Join-Path $installerDir 'FileAutoSave.wxs'
@@ -37,8 +38,8 @@ foreach ($project in $projects) {
     Get-ChildItem $bin -Filter *.dll | Copy-Item -Destination $staging -Force
 }
 
-Write-Host "3/4 打包 MSI ..."
-& wix build $wxs -o $msi -arch x64 -ext WixToolset.UI.wixext `
+Write-Host "3/4 打包 MSI（语言 $culture）..."
+& wix build $wxs -o $msi -arch x64 -ext WixToolset.UI.wixext -culture $culture `
     -d "StagingDir=$staging" -d "LicenseRtf=$(Join-Path $installerDir 'License.rtf')"
 if (-not $?) { throw 'wix 打包失败。' }
 
