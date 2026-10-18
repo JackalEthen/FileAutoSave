@@ -3,7 +3,6 @@ bin/
 obj/
 installer/staging/
 installer/*.msi
-installer/*.exe
 installer/*.wixpdb
 
 # Visual Studio / Rider
