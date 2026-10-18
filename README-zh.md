@@ -38,9 +38,11 @@ FileAutoSave 填的就是这个缺口——一个跑在 Office 进程内的 COM 
 
 ## 安装
 
-1. 下载 `FileAutoSave.msi`
+1. 下载 `FileAutoSave-Setup.exe`
 2. 双击安装（向导：欢迎 → 许可 → 选目录 → 安装）
 3. 打开 Word / Excel / PowerPoint → **「开始」选项卡** → 「**文件自动保存**」组
+
+这个安装程序是一个小引导程序，内含**中文**和**英文**两份 MSI：**按你 Windows 的界面语言自动选一份**，不弹选择框。只想用单独的 MSI？Release 里也挂了 `FileAutoSave-zh-CN.msi` 和 `FileAutoSave-en-US.msi`。
 
 卸载：设置 → 应用 → `FileAutoSave`（用户数据默认保留；要清掉用 `tools\uninstall.ps1 -RemoveUserData`）
 
@@ -81,17 +83,19 @@ FileAutoSave 填的就是这个缺口——一个跑在 Office 进程内的 COM 
 ## 从源码构建
 
 ```powershell
-# 需要 .NET SDK + WiX 4
-dotnet tool install --global wix --version 4.*
+# 需要 .NET SDK + WiX 5
+dotnet tool install --global wix --version 5.*
+wix extension add -g WixToolset.UI.wixext/5.0.2
+wix extension add -g WixToolset.BootstrapperApplications.wixext/5.0.2
 
 # 编译 + 跑自检
 dotnet build FileAutoSave.slnx -c Release
 dotnet run --project src\FileAutoSave.SelfCheck -c Release
 
-# 打 MSI（含向导 UI 与 ICE 校验）
+# 产出 installer\FileAutoSave-Setup.exe 与中英两份 MSI（都过 ICE 校验）
 powershell -ExecutionPolicy Bypass -File tools\build-msi.ps1
 
-# 或者用脚本方式安装（免 MSI）
+# 或者用脚本方式安装（免安装包）
 powershell -ExecutionPolicy Bypass -File tools\install.ps1   # 需管理员
 ```
 

@@ -1,0 +1,24 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+
+  <!--
+    引导程序：内装中/英两份 MSI，**按用户的界面语言自动选**，不做下拉。
+    简体中文界面 → 装中文包；其它语言 → 装英文包。
+    （Burn 没有 WixBundleUILanguage 这个变量；判断语言要用 UserUILanguageID / SystemLanguageID。）
+  -->
+  <Bundle Name="FileAutoSave" Version="0.2.1" Manufacturer="FileAutoSave"
+          UpgradeCode="8D2C4B10-7F3A-4E21-9B77-1A2C3D4E5F70" Compressed="yes">
+
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense"
+                                              LicenseUrl="https://www.gnu.org/licenses/agpl-3.0.html" />
+    </BootstrapperApplication>
+
+    <Chain>
+      <MsiPackage Id="MsiZh" SourceFile="$(MsiZh)" Compressed="yes"
+                  InstallCondition="UserUILanguageID = 2052" />
+      <MsiPackage Id="MsiEn" SourceFile="$(MsiEn)" Compressed="yes"
+                  InstallCondition="UserUILanguageID &lt;&gt; 2052" />
+    </Chain>
+  </Bundle>
+</Wix>

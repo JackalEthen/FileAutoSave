@@ -38,9 +38,11 @@ FileAutoSave fills that gap — a COM add-in running inside the Office process t
 
 ## Install
 
-1. Download `FileAutoSave.msi`
+1. Download `FileAutoSave-Setup.exe`
 2. Run it (wizard: welcome → license → install folder → install)
 3. Open Word / Excel / PowerPoint → **Home** tab → the **FileAutoSave** group
+
+The setup is a small bootstrapper containing both a Chinese and an English MSI: it **picks one automatically from your Windows UI language** — no prompt. Prefer a plain MSI? `FileAutoSave-zh-CN.msi` and `FileAutoSave-en-US.msi` are attached to the release as well.
 
 Uninstall: Settings → Apps → `FileAutoSave` (user data is kept by default; use `tools\uninstall.ps1 -RemoveUserData` to wipe it)
 
@@ -81,14 +83,16 @@ Both switches **default to off** and their state is **remembered per document**:
 ## Build from source
 
 ```powershell
-# requires the .NET SDK and WiX 4
-dotnet tool install --global wix --version 4.*
+# requires the .NET SDK and WiX 5
+dotnet tool install --global wix --version 5.*
+wix extension add -g WixToolset.UI.wixext/5.0.2
+wix extension add -g WixToolset.BootstrapperApplications.wixext/5.0.2
 
 # build + self-check
 dotnet build FileAutoSave.slnx -c Release
 dotnet run --project src\FileAutoSave.SelfCheck -c Release
 
-# build the MSI (wizard UI included, ICE-validated)
+# produces installer\FileAutoSave-Setup.exe plus the two localized MSIs (ICE-validated)
 powershell -ExecutionPolicy Bypass -File tools\build-msi.ps1
 
 # or install without the MSI
