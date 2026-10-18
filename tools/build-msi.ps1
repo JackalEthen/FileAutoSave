@@ -58,6 +58,7 @@ if (-not $?) { throw '英文 MSI 打包失败。' }
 Write-Host '5/5 打包引导程序（按系统语言自动选）...'
 & wix build $bundleWxs -o $setup -arch x64 `
     -ext WixToolset.BootstrapperApplications.wixext `
+    -loc (Join-Path $installerDir 'bundle.zh-CN.wxl') `
     -d "MsiZh=$msiZh" -d "MsiEn=$msiEn"
 if (-not $?) { throw '引导程序打包失败。' }
 
