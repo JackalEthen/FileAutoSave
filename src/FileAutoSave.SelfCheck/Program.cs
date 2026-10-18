@@ -24,6 +24,7 @@ namespace FileAutoSave.SelfCheck
                 CheckIntervalClamping();
                 CheckSettingsRoundTrip(workspace);
                 CheckSnapshotDedupAndRetention(workspace);
+                CheckWebNetdiskLinks(workspace);
             }
             finally
             {
@@ -134,6 +135,32 @@ namespace FileAutoSave.SelfCheck
             File.WriteAllText(sameName, "other");
             store.Save(sameName, "other");
             Check(store.DirectoryName(sameName) != "copy.docx", "同名不同路径的文件不共用目录");
+        }
+
+        private static void CheckWebNetdiskLinks(string workspace)
+        {
+            var defaults = WebNetdiskLink.Defaults();
+            Check(defaults.Count == 5, "默认内置 5 个网页网盘入口");
+            Check(defaults.All(l => l.IsUsable()), "默认入口全部可用");
+            Check(new AddInSettings().WebNetdisks.Count == 5, "新配置自带默认入口");
+
+            Check(!new WebNetdiskLink { Name = "坏网址", Url = "not a url" }.IsUsable(), "非法网址被判为不可用");
+            Check(!new WebNetdiskLink { Name = "", Url = "https://a.com" }.IsUsable(), "空名称被判为不可用");
+            Check(!new WebNetdiskLink { Name = "本地文件", Url = "file:///C:/x" }.IsUsable(), "非 http(s) 网址被判为不可用");
+
+            var store = new SettingsStore(Path.Combine(workspace, "netdisk.json"));
+            var settings = new AddInSettings();
+            settings.WebNetdisks.Add(new WebNetdiskLink { Name = "我的网盘", Url = "https://example.com" });
+            store.Save(settings);
+
+            var loaded = store.Load();
+            Check(loaded.WebNetdisks.Count == 6, "网页网盘设置往返");
+            Check(loaded.WebNetdisks.Any(l => l.Name == "我的网盘"), "自定义入口已持久化");
+
+            // 用户主动清空后不应再被默认值灌回来
+            settings.WebNetdisks = new System.Collections.Generic.List<WebNetdiskLink>();
+            store.Save(settings);
+            Check(store.Load().WebNetdisks.Count == 0, "显式清空后保持为空");
         }
 
         private static void Check(bool condition, string name)

@@ -84,6 +84,11 @@ namespace FileAutoSave.AddIn.PowerPoint
             _actions?.OpenSettings(ActiveDocumentAdapter());
         }
 
+        public void OnBackupToWeb(IRibbonControl control)
+        {
+            _actions?.BackupToWebNetdisk(ActiveDocumentAdapter());
+        }
+
         /// <summary>当前活动演示文稿的适配器（设置窗口要显示它的文档标识）。</summary>
         private PowerPointHostAdapter? ActiveDocumentAdapter()
         {
@@ -273,6 +278,7 @@ namespace FileAutoSave.AddIn.PowerPoint
           <toggleButton id=""btnAutoSave"" label=""自动保存"" size=""large"" image=""save"" onAction=""OnToggleAutoSave"" getPressed=""GetAutoSavePressed"" screentip=""按设定间隔用当前内容覆盖原文件""/>
           <toggleButton id=""btnAutoRecover"" label=""自动恢复"" size=""large"" image=""rotate"" onAction=""OnToggleAutoRecover"" getPressed=""GetAutoRecoverPressed"" screentip=""按设定间隔记录可回滚的快照""/>
           <button id=""btnHistory"" label=""版本历史"" size=""large"" image=""history"" onAction=""OnShowHistoryPane"" screentip=""在文档右侧打开版本历史侧边栏""/>
+          <button id=""btnBackupWeb"" label=""备份到网盘"" size=""large"" image=""cloud"" onAction=""OnBackupToWeb"" screentip=""打开网盘网页并定位最新快照，手动拖拽上传""/>
           <button id=""btnSettings"" label=""设置"" size=""large"" image=""settings"" onAction=""OnShowSettings"" screentip=""间隔、快照与云端设置""/>
         </group>
       </tab>

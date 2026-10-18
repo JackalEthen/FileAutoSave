@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using FileAutoSave.Core.Settings;
 using FileAutoSave.Core.Ui;
 
 namespace FileAutoSave.Core.Hosting
@@ -77,6 +81,89 @@ namespace FileAutoSave.Core.Hosting
             using (var form = new SettingsForm(_runtime, activeDocument))
             {
                 form.ShowDialog();
+            }
+        }
+
+        /// <summary>
+        /// 备份到网页网盘：打开对方官网，同时在资源管理器里定位当前文档的最新快照，
+        /// 用户自己拖拽上传。我们不碰它的接口——既不违规也不会随对方改版而失效。
+        /// </summary>
+        public void BackupToWebNetdisk(IHostAdapter? activeDocument)
+        {
+            var links = _runtime.Settings.WebNetdisks?.Where(l => l.IsUsable()).ToList() ?? new List<WebNetdiskLink>();
+            if (links.Count == 0)
+            {
+                MessageBox.Show(
+                    "还没有可用的网页网盘入口。\n请到「设置 → 网页网盘」里添加名称和网址。",
+                    "文件自动保存", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!RequireSaved(activeDocument))
+            {
+                return;
+            }
+
+            var path = activeDocument!.FilePath!;
+
+            // Store.List 按时间倒序，第一个就是最新快照。
+            var newest = _runtime.Store.List(path).FirstOrDefault();
+            if (newest == null)
+            {
+                MessageBox.Show(
+                    "当前文档还没有快照可供备份。\n请先开启「自动恢复」，或等一次自动保存/手动保存生成快照。",
+                    "文件自动保存", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var snapshotPath = _runtime.Store.ResolvePath(path, newest);
+
+            using (var picker = new WebNetdiskPickerForm(links, Path.GetFileName(snapshotPath)))
+            {
+                if (picker.ShowDialog() != DialogResult.OK || picker.Selected == null)
+                {
+                    return;
+                }
+
+                OpenNetdisk(picker.Selected, snapshotPath);
+            }
+
+            if (_notified.Add("webnetdisk-hint"))
+            {
+                MessageBox.Show(
+                    "已打开网盘网页，并在资源管理器里定位了最新快照。\n把文件拖进网页的上传区就完成了。",
+                    "文件自动保存", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        /// <summary>用系统默认浏览器打开网盘，并在资源管理器里选中快照文件。</summary>
+        private static void OpenNetdisk(WebNetdiskLink link, string snapshotPath)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(link.Url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.LogException("WebNetdisk: 打开浏览器", ex);
+            }
+
+            if (!File.Exists(snapshotPath))
+            {
+                return;
+            }
+
+            try
+            {
+                // ponytail: 只定位文件，不额外打开文件夹窗口——少一个窗口少一份干扰。
+                Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + snapshotPath + "\"")
+                {
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.LogException("WebNetdisk: 定位快照", ex);
             }
         }
 

@@ -23,6 +23,7 @@
     <EmbeddedResource Include="Resources\ribbon.rotate.png" LogicalName="FileAutoSave.Core.ribbon.rotate.png" />
     <EmbeddedResource Include="Resources\ribbon.history.png" LogicalName="FileAutoSave.Core.ribbon.history.png" />
     <EmbeddedResource Include="Resources\ribbon.settings.png" LogicalName="FileAutoSave.Core.ribbon.settings.png" />
+    <EmbeddedResource Include="Resources\ribbon.cloud.png" LogicalName="FileAutoSave.Core.ribbon.cloud.png" />
   </ItemGroup>
 
 </Project>

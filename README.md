@@ -30,6 +30,7 @@ FileAutoSave fills that gap — a COM add-in running inside the Office process t
 | **Version history pane** | A document-side panel listing snapshots with a text-projection preview and one-click rollback |
 | **Rollback** | Always stores a "pre-rollback snapshot" first, so a mis-click is recoverable |
 | **Cloud version history** | WebDAV (Nextcloud / Synology / Jianguoyun), S3-compatible (AWS / MinIO / Alibaba OSS), NAS (UNC share) |
+| **Backup to web netdisk** | No cloud account needed: opens Quark / Xunlei / Baidu / 189 / Aliyun Drive in your browser and locates the latest snapshot so you drag it up |
 | **Retry queue** | Failed cloud uploads go to a persisted queue with exponential backoff |
 | **Per-file switches** | Auto-save and auto-recover are **independent** and their state is remembered per document |
 | **Document identity** | History stays attached after a rename or move |
@@ -48,12 +49,13 @@ Uninstall: Settings → Apps → `FileAutoSave` (user data is kept by default; u
 
 ## Usage
 
-Four buttons on the ribbon:
+Five buttons on the ribbon:
 
 - **Auto-save** (toggle) — overwrite the original file on the interval
 - **Auto-recover** (toggle) — record rollbackable snapshots
 - **Version history** — open the side pane
-- **Settings** — interval / snapshot root / retention / cloud
+- **Backup to netdisk** — open the netdisk site and locate the latest snapshot, then drag it up
+- **Settings** — interval / snapshot root / retention / cloud / web netdisks
 
 Both switches **default to off** and their state is **remembered per document**:
 
@@ -63,6 +65,20 @@ Both switches **default to off** and their state is **remembered per document**:
 | on | off | the file is overwritten on the interval; **no** version history |
 | off | on | the file is never overwritten, but every manual save records a snapshot |
 | on | on | timed overwrite **and** timed snapshots |
+
+## No cloud account? Three ways to back up
+
+Auto-recover and version history are **already fully local** — they work with no cloud configured at all. For off-site backup, pick one:
+
+| Your situation | Use | Cost |
+|---|---|---|
+| You have a NAS or a LAN share | Settings → Cloud target → **NAS (UNC path)** | just fill in `\\PC\share\FileAutoSave` — real upload, cloud version history included |
+| You have an account, or can register | Settings → Cloud target → **WebDAV**: Jianguoyun at `https://dav.jianguoyun.com/dav/` (password = the *app password* under Account info → Security options) — or **S3-compatible**: Cloudflare R2, Backblaze B2, MinIO | **zero code**, configure and go. R2 and B2 each have 10 GB free; Jianguoyun's free tier caps *upload* traffic at 1 GB/month |
+| Neither | Ribbon → **Backup to netdisk** | opens the site and locates the snapshot — **you drag it up yourself** |
+
+**About "Backup to netdisk"**: it is only a shortcut to the official site. Quark / Xunlei / Baidu **publish no API**, and emulating their private endpoints both violates their terms and breaks whenever they change them — so we don't. The cost is that it is **off-site backup only**: with no file listing available there is no cloud version history and no cloud rollback. History always stays local.
+
+Five entries (Quark, Xunlei, Baidu, 189, Aliyun Drive) ship by default; add or remove any of them under **Settings → Web netdisks**.
 
 ## Snapshot layout
 

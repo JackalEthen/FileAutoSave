@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using FileAutoSave.Core.Storage;
+using Newtonsoft.Json;
 
 namespace FileAutoSave.Core.Settings
 {
@@ -18,6 +20,18 @@ namespace FileAutoSave.Core.Settings
         public int SnapshotRetention { get; set; } = 50;
 
         public CloudTargetSettings Cloud { get; set; } = new CloudTargetSettings();
+
+        /// <summary>
+        /// 网页网盘入口（打开浏览器 + 定位最新快照，用户手动拖拽上传）。
+        /// 与 <see cref="Cloud"/> 无关：那套是真上传，这套只是通往官网的快捷方式。
+        /// </summary>
+        /// <remarks>
+        /// 必须显式 Replace：Json.NET 默认会**复用**上面这个已建好的列表并往里追加，
+        /// 于是每次存读都把默认 5 条累加一遍（5 → 11 → 16 …）。
+        /// Replace 之后语义才对：键缺失 → 保留默认值；键存在（含空数组）→ 整体覆盖。
+        /// </remarks>
+        [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+        public List<WebNetdiskLink> WebNetdisks { get; set; } = WebNetdiskLink.Defaults();
 
         public bool NotifyOnCloudFailure { get; set; } = true;
 
