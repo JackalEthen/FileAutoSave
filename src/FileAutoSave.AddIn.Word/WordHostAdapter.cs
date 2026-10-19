@@ -21,6 +21,22 @@ namespace FileAutoSave.AddIn.Word
 
         public bool IsSaved => !string.IsNullOrEmpty(FilePath);
 
+        public bool HasUnsavedChanges
+        {
+            get
+            {
+                try
+                {
+                    return !_document.Saved;
+                }
+                catch (Exception)
+                {
+                    // 问不到就当没有未保存改动：宁可放过，也不要用猜的结论拦住用户回滚。
+                    return false;
+                }
+            }
+        }
+
         public string? FilePath
         {
             get

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using FileAutoSave.Core.Storage;
 using Newtonsoft.Json;
 
 namespace FileAutoSave.Core.Snapshots
@@ -360,8 +361,11 @@ namespace FileAutoSave.Core.Snapshots
             {
                 return JsonConvert.DeserializeObject<DocumentIndex>(File.ReadAllText(path));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // 目录里的快照文件都还在，只是这份索引读不出来。必须留痕，
+                // 否则就是"快照还在，用户却以为历史全没了"这种查无对证的故障。
+                Diagnostics.LogException("索引文件损坏（快照本体仍在磁盘上）: " + path, ex);
                 return null;
             }
         }
@@ -369,7 +373,7 @@ namespace FileAutoSave.Core.Snapshots
         private static void SaveIndex(string directory, DocumentIndex index)
         {
             Directory.CreateDirectory(directory);
-            File.WriteAllText(
+            AtomicFile.WriteAllText(
                 Path.Combine(directory, IndexFileName),
                 JsonConvert.SerializeObject(index, Formatting.Indented));
         }

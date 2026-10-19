@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using FileAutoSave.Core.Storage;
 using Newtonsoft.Json;
 
 namespace FileAutoSave.Core.Snapshots
@@ -80,8 +81,11 @@ namespace FileAutoSave.Core.Snapshots
 
                 return JsonConvert.DeserializeObject<List<Entry>>(File.ReadAllText(_path)) ?? new List<Entry>();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // 丢的是"路径 ↔ 目录"的索引，各文档目录里的 index.json 还在，
+                // 历史本身没丢（SnapshotStore 还有目录名兜底），但必须留痕。
+                Diagnostics.LogException("注册表读取失败: " + _path, ex);
                 return new List<Entry>();
             }
         }
@@ -96,10 +100,11 @@ namespace FileAutoSave.Core.Snapshots
                     Directory.CreateDirectory(directory);
                 }
 
-                File.WriteAllText(_path, JsonConvert.SerializeObject(_entries, Formatting.Indented));
+                AtomicFile.WriteAllText(_path, JsonConvert.SerializeObject(_entries, Formatting.Indented));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Diagnostics.LogException("注册表写入失败: " + _path, ex);
             }
         }
     }

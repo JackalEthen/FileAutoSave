@@ -11,6 +11,17 @@ namespace FileAutoSave.Core.Hosting
         /// <summary>文档是否已保存过（有磁盘路径）。未命名文档为 false。</summary>
         bool IsSaved { get; }
 
+        /// <summary>
+        /// 文档当前是否有**尚未保存到磁盘**的改动。
+        /// </summary>
+        /// <remarks>
+        /// 与 <see cref="IsSaved"/> 完全是两回事：那个问"有没有路径"，
+        /// 这个问"内存里的内容和磁盘上是否一致"。
+        /// 回滚会用 Close(false) 丢掉未保存的改动，而"回滚前快照"存的是**磁盘**内容，
+        /// 两者不是一回事 —— 所以回滚前必须先问这一句。
+        /// </remarks>
+        bool HasUnsavedChanges { get; }
+
         /// <summary>文档的磁盘路径；未保存时为 null。</summary>
         string? FilePath { get; }
 

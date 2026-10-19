@@ -276,7 +276,7 @@ namespace FileAutoSave.Core.Ui
 
             var when = row.Info.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
             var answer = MessageBox.Show(
-                $"将用 {when} 的快照覆盖当前文档。\n当前状态会先自动存为一份快照。继续吗？",
+                $"将用 {when} 的快照覆盖当前文档。\n覆盖前，磁盘上当前的内容会先自动存为一份快照。\n继续吗？",
                 "回滚确认", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
             if (answer != DialogResult.Yes)

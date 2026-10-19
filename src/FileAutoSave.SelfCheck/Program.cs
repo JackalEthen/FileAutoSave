@@ -2,6 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 using FileAutoSave.Core;
+using FileAutoSave.Core.Cloud;
+using FileAutoSave.Core.Hosting;
+using FileAutoSave.Core.Security;
 using FileAutoSave.Core.Settings;
 using FileAutoSave.Core.Snapshots;
 
@@ -25,6 +28,9 @@ namespace FileAutoSave.SelfCheck
                 CheckSettingsRoundTrip(workspace);
                 CheckSnapshotDedupAndRetention(workspace);
                 CheckSwitchesConfiguredRoundTrip(workspace);
+                CheckRollbackKeepsTargetSnapshot(workspace);
+                CheckRollbackRefusesUnsavedChanges(workspace);
+                CheckCloudFactoryIgnoresEmptyEndpoint();
                 CheckWebNetdiskLinks(workspace);
                 CheckLineDiff();
             }
@@ -221,6 +227,116 @@ namespace FileAutoSave.SelfCheck
             Check(big.Count == 1800, $"超限退化为整块删增（实得 {big.Count}）");
             Check(big.Count(l => l.Kind == DiffKind.Removed) == 900, "超限时旧块全标删");
             Check(big.Count(l => l.Kind == DiffKind.Added) == 900, "超限时新块全标增");
+        }
+
+        /// <summary>
+        /// 假的宿主适配层：回滚路径无法在自检里跑真 Office，用它复刻真实调用顺序
+        /// （先存回滚前快照 → 再用目标快照覆盖），并记录"覆盖时文件还在不在"。
+        /// </summary>
+        private sealed class FakeAdapter : IHostAdapter
+        {
+            private readonly string _path;
+
+            public FakeAdapter(string path, bool hasUnsavedChanges)
+            {
+                _path = path;
+                HasUnsavedChanges = hasUnsavedChanges;
+            }
+
+            public bool CopySourceExisted { get; private set; }
+
+            public string HostName => "Fake";
+
+            public bool IsSaved => true;
+
+            public string? FilePath => _path;
+
+            public bool HasUnsavedChanges { get; }
+
+            public void Save() { }
+
+            public string ExtractTextProjection() => "fake-projection";
+
+            public void RollbackFrom(string snapshotPath)
+            {
+                CopySourceExisted = File.Exists(snapshotPath);
+                File.Copy(snapshotPath, _path, overwrite: true);
+            }
+        }
+
+        private static void CheckRollbackKeepsTargetSnapshot(string workspace)
+        {
+            // 回滚到**最旧**那份，而保留数刚好等于已有快照数 —— 保存"回滚前快照"
+            // 会触发 Prune 删掉最旧的，正是回滚要用的那份。
+            var versions = Path.Combine(workspace, "rollback-versions");
+            var source = Path.Combine(workspace, "rollback.docx");
+            var store = new SnapshotStore(versions, retention: 3);
+
+            for (var i = 1; i <= 3; i++)
+            {
+                File.WriteAllText(source, "v" + i);
+                store.Save(source, "p" + i);
+            }
+
+            var target = store.List(source)[2];
+
+            // 必须真的改了内容：内容没变时 store.Save 会被去重挡掉，压根不触发 Prune。
+            // 真实场景正是"改过之后要回滚"，所以这里模拟那次改动。
+            File.WriteAllText(source, "changed-since-last-snapshot");
+
+            var adapter = new FakeAdapter(source, hasUnsavedChanges: false);
+
+            RollbackService.Rollback(adapter, store, target);
+
+            Check(adapter.CopySourceExisted, "回滚前必须确认目标快照还在（否则文档已关闭却复制失败）");
+            Check(File.ReadAllText(source) == "v1", "回滚后原文件内容 == 目标快照内容");
+            Check(store.List(source).Count == 3, "回滚后仍保持保留上限");
+        }
+
+        private static void CheckRollbackRefusesUnsavedChanges(string workspace)
+        {
+            var versions = Path.Combine(workspace, "unsaved-versions");
+            var source = Path.Combine(workspace, "unsaved.docx");
+            var store = new SnapshotStore(versions, retention: 10);
+
+            File.WriteAllText(source, "on-disk");
+            store.Save(source, "p");
+            var target = store.List(source)[0];
+
+            var adapter = new FakeAdapter(source, hasUnsavedChanges: true);
+            var blocked = false;
+            try
+            {
+                RollbackService.Rollback(adapter, store, target);
+            }
+            catch (InvalidOperationException)
+            {
+                blocked = true;
+            }
+
+            Check(blocked, "有未保存改动时拒绝回滚（否则那些改动会被 Close(false) 丢掉且没被存下来）");
+            Check(File.ReadAllText(source) == "on-disk", "被拒绝时原文件不受影响");
+        }
+
+        private static void CheckCloudFactoryIgnoresEmptyEndpoint()
+        {
+            var credential = new CloudCredential();
+            foreach (CloudTargetKind kind in new[] { CloudTargetKind.WebDav, CloudTargetKind.S3, CloudTargetKind.Nas })
+            {
+                var settings = new CloudTargetSettings { Kind = kind, Endpoint = string.Empty };
+                var target = null as object;
+                try
+                {
+                    target = CloudTargetFactory.Create(settings, credential);
+                }
+                catch (Exception ex)
+                {
+                    Check(false, $"{kind} 空端点不应抛异常（抛出会让整个加载项起不来）：{ex.GetType().Name}");
+                    continue;
+                }
+
+                Check(target == null, $"{kind} 空端点视为未配置，返回 null");
+            }
         }
 
         private static void Check(bool condition, string name)
