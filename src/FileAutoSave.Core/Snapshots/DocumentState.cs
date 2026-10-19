@@ -13,5 +13,13 @@ namespace FileAutoSave.Core.Snapshots
 
         /// <summary>记录可回滚的快照（含每次手动保存）。</summary>
         public bool AutoRecoverEnabled { get; set; }
+
+        /// <summary>
+        /// 用户是否已经就这个文档**明确表过态**（开或关都算）。
+        /// 没有它就分不清"默认关着"和"我特意关掉了"，
+        /// 于是关掉之后每次打开还是弹窗引导，功能变成噪音。
+        /// 老配置里没有这个字段，反序列化为 false，用户会再看到一次提示，之后不再打扰。
+        /// </summary>
+        public bool SwitchesConfigured { get; set; }
     }
 }

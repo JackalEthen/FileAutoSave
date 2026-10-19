@@ -90,11 +90,12 @@ namespace FileAutoSave.Core.Hosting
         /// </summary>
         public void BackupToWebNetdisk(IHostAdapter? activeDocument)
         {
-            var links = _runtime.Settings.WebNetdisks?.Where(l => l.IsUsable()).ToList() ?? new List<WebNetdiskLink>();
+            // 固定的五个入口，没有可配置项——用户要加网盘就改这里。
+            var links = WebNetdiskLink.Defaults().Where(l => l.IsUsable()).ToList();
             if (links.Count == 0)
             {
                 MessageBox.Show(
-                    "还没有可用的网页网盘入口。\n请到「设置 → 网页网盘」里添加名称和网址。",
+                    "没有可用的网页网盘入口。\n这是内置列表，请检查安装是否完整。",
                     "文件自动保存", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }

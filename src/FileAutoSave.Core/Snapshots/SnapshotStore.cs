@@ -108,6 +108,29 @@ namespace FileAutoSave.Core.Snapshots
         }
 
         /// <summary>
+        /// **只读**地取该文档的每文件状态，绝不落盘、也绝不凭空造文档。
+        /// 供功能区开关与设置窗口这类高频显示使用：
+        /// 显示永远以磁盘为准，不给"内存缓存与磁盘不一致"留任何机会。
+        /// 找不到就返回 null（显示为"尚未记录"），而不是编一个临时 DocumentId 出来。
+        /// </summary>
+        public DocumentState? ReadState(string sourceFile)
+        {
+            if (string.IsNullOrEmpty(sourceFile))
+            {
+                return null;
+            }
+
+            var entry = _registry.FindBySourcePath(sourceFile);
+            if (entry == null || string.IsNullOrEmpty(entry.DirectoryName))
+            {
+                return null;
+            }
+
+            var index = LoadIndex(Path.Combine(_root, entry.DirectoryName));
+            return index == null ? null : ToState(index);
+        }
+
+        /// <summary>
         /// 确保该文档有唯一标识与落盘的状态记录（① 注册表 + ② 该文档的 index.json），
         /// 并返回当前的每文件状态。**新文档的两个开关默认关闭。**
         /// </summary>
@@ -134,6 +157,7 @@ namespace FileAutoSave.Core.Snapshots
             location.Index.SourcePath = sourceFile;
             location.Index.AutoSaveEnabled = state.AutoSaveEnabled;
             location.Index.AutoRecoverEnabled = state.AutoRecoverEnabled;
+            location.Index.SwitchesConfigured = state.SwitchesConfigured;
 
             SaveIndex(location.Directory, location.Index);
             UpdateRegistry(location.Index, location.Directory, sourceFile, null);
@@ -143,7 +167,8 @@ namespace FileAutoSave.Core.Snapshots
         {
             DocumentId = index.DocumentId,
             AutoSaveEnabled = index.AutoSaveEnabled,
-            AutoRecoverEnabled = index.AutoRecoverEnabled
+            AutoRecoverEnabled = index.AutoRecoverEnabled,
+            SwitchesConfigured = index.SwitchesConfigured
         };
 
         private void UpdateRegistry(DocumentIndex index, string directory, string sourceFile, string? fingerprint)
@@ -155,6 +180,7 @@ namespace FileAutoSave.Core.Snapshots
             entry.SourcePath = sourceFile;
             entry.AutoSaveEnabled = index.AutoSaveEnabled;
             entry.AutoRecoverEnabled = index.AutoRecoverEnabled;
+            entry.SwitchesConfigured = index.SwitchesConfigured;
             if (!string.IsNullOrEmpty(fingerprint))
             {
                 entry.Fingerprint = fingerprint!;

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using FileAutoSave.Core.Hosting;
@@ -50,18 +49,6 @@ namespace FileAutoSave.Core.Ui
         private readonly TextBox _documentId = new TextBox { ReadOnly = true };
         private readonly TextBox _documentAutoSave = new TextBox { ReadOnly = true };
         private readonly TextBox _documentAutoRecover = new TextBox { ReadOnly = true };
-
-        private readonly ListBox _netdiskList = new ListBox { IntegralHeight = false, DisplayMember = "Name" };
-        private readonly TextBox _netdiskName = new TextBox();
-        private readonly TextBox _netdiskUrl = new TextBox();
-        private readonly List<WebNetdiskLink> _links = new List<WebNetdiskLink>();
-        private readonly Label _netdiskHint = new Label
-        {
-            AutoSize = false,
-            ForeColor = Color.DimGray,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Text = "点功能区「备份到网盘」：打开该网址，并在资源管理器里定位最新快照，你把文件拖进网页即可。"
-        };
 
         private readonly IHostAdapter? _activeDocument;
 
@@ -151,12 +138,6 @@ namespace FileAutoSave.Core.Ui
             _s3Rows.Add(AddRow(string.Empty, _useSsl));
             _nasRows.Add(AddRow(string.Empty, _nasHint));
 
-            AddHeader("网页网盘（手动上传：打开官网 + 定位最新快照）");
-            AddRow("已配置", _netdiskList, BuildNetdiskButtons(), 156);
-            AddRow("名称", _netdiskName);
-            AddRow("网址", _netdiskUrl);
-            AddRow(string.Empty, _netdiskHint);
-
             AddHeader("提醒");
             AddRow(string.Empty, _notify);
 
@@ -181,10 +162,10 @@ namespace FileAutoSave.Core.Ui
             _table.SetColumnSpan(_table.GetControlFromPosition(0, row)!, 3);
         }
 
-        private int AddRow(string label, Control control, Control? trailing = null, int height = RowHeight)
+        private int AddRow(string label, Control control, Control? trailing = null)
         {
             var row = _table.RowCount++;
-            _table.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            _table.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
 
             if (!string.IsNullOrEmpty(label))
             {
@@ -230,83 +211,8 @@ namespace FileAutoSave.Core.Ui
             return row;
         }
 
-        /// <summary>网页网盘那一行的添加/更新与删除按钮。</summary>
-        private Control BuildNetdiskButtons()
+        private FlowLayoutPanel BuildButtonBar()
         {
-            var upsert = new Button { Text = "添加/更新", AutoSize = true, MinimumSize = new Size(96, 30) };
-            var remove = new Button { Text = "删除", AutoSize = true, MinimumSize = new Size(96, 30) };
-            upsert.Click += (_, __) => UpsertNetdisk();
-            remove.Click += (_, __) => RemoveNetdisk();
-
-            _netdiskList.SelectedIndexChanged += (_, __) =>
-            {
-                if (_netdiskList.SelectedItem is WebNetdiskLink link)
-                {
-                    _netdiskName.Text = link.Name;
-                    _netdiskUrl.Text = link.Url;
-                }
-            };
-
-            var panel = new FlowLayoutPanel
-            {
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoSize = false,
-                Width = TrailingWidth
-            };
-            panel.Controls.Add(upsert);
-            panel.Controls.Add(remove);
-            return panel;
-        }
-
-        private void RefreshNetdisks()
-        {
-            _netdiskList.Items.Clear();
-            foreach (var link in _links)
-            {
-                _netdiskList.Items.Add(link);
-            }
-        }
-
-        private void UpsertNetdisk()
-        {
-            var candidate = new WebNetdiskLink { Name = _netdiskName.Text.Trim(), Url = _netdiskUrl.Text.Trim() };
-            if (!candidate.IsUsable())
-            {
-                MessageBox.Show(this,
-                    "请填写名称，且网址必须是 http:// 或 https:// 开头的完整网址。",
-                    "文件自动保存", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            var index = _links.FindIndex(l => l.Name == candidate.Name);
-            if (index >= 0)
-            {
-                _links[index] = candidate;
-            }
-            else
-            {
-                _links.Add(candidate);
-            }
-
-            RefreshNetdisks();
-            _netdiskList.SelectedIndex = index >= 0 ? index : _links.Count - 1;
-        }
-
-        private void RemoveNetdisk()
-        {
-            if (!(_netdiskList.SelectedItem is WebNetdiskLink link))
-            {
-                return;
-            }
-
-            _links.Remove(link);
-            _netdiskName.Clear();
-            _netdiskUrl.Clear();
-            RefreshNetdisks();
-        }
-
-        private FlowLayoutPanel BuildButtonBar()        {
             var save = new Button
             {
                 Text = "保存",
@@ -385,10 +291,6 @@ namespace FileAutoSave.Core.Ui
             _webDavPassword.Text = credential.Secret;
             _s3Secret.Text = credential.Secret;
 
-            _links.Clear();
-            _links.AddRange(settings.WebNetdisks ?? WebNetdiskLink.Defaults());
-            RefreshNetdisks();
-
             _summary.Text = $"当前：{_runtime.ActiveDocumentCount} 个活跃文档，{_runtime.PendingUploads} 个待上传";
 
             RefreshDocumentInfo();
@@ -433,7 +335,6 @@ namespace FileAutoSave.Core.Ui
             settings.Cloud.UserName = _userName.Text.Trim();
             settings.Cloud.Bucket = _bucket.Text.Trim();
             settings.Cloud.UseSsl = _useSsl.Checked;
-            settings.WebNetdisks = new List<WebNetdiskLink>(_links);
 
             _runtime.SaveSettings(settings);
             _runtime.SaveCredential(new CloudCredential

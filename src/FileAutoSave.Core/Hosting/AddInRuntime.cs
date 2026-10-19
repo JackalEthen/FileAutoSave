@@ -8,16 +8,23 @@ using FileAutoSave.Core.Snapshots;
 
 namespace FileAutoSave.Core.Hosting
 {
-    /// <summary>
-    /// 三个宿主共用的运行时：持有全局设置、快照库、上传队列，
-    /// 并为每个打开的文档挂一个 <see cref="AutoSaveService"/>，各自带**每文件**的开关状态。
-    /// </summary>
-    /// <remarks>
-    /// 必须在宿主 UI 线程上构造与调用。
-    /// ponytail: 快照根目录与保留数只在启动时生效，运行期改动需重启宿主。
-    /// </remarks>
-    public sealed class AddInRuntime : IDisposable
-    {
+/// <summary>
+        /// 三个宿主共用的运行时：持有全局设置、快照库、上传队列，
+        /// 并为每个打开的文档挂一个 <see cref="AutoSaveService"/>，各自带**每文件**的开关状态。
+        /// </summary>
+        /// <remarks>
+        /// 必须在宿主 UI 线程上构造与调用。
+        /// 本类**不持有定时器**：节拍由宿主外壳的心跳提供（外壳每个应用一个定时器），
+        /// 所以同时开多少文档都只有 1 个定时器。
+        /// ponytail: 快照根目录与保留数只在启动时生效，运行期改动需重启宿主。
+        /// </remarks>
+        public sealed class AddInRuntime : IDisposable
+        {
+        /// <summary>
+        /// 宿主外壳的心跳间隔（毫秒）。同时充当"扫描挂载"与"间隔到期"的节拍。
+        /// </summary>
+        public const int HeartbeatIntervalMs = 15000;
+
         private readonly Dictionary<string, AutoSaveService> _services =
             new Dictionary<string, AutoSaveService>(StringComparer.OrdinalIgnoreCase);
 
@@ -73,7 +80,6 @@ namespace FileAutoSave.Core.Hosting
 
                 var service = new AutoSaveService(adapter, state, _settings, Store, _queue, Notify);
                 _services[documentId] = service;
-                service.Start();
             }
         }
 
@@ -83,13 +89,25 @@ namespace FileAutoSave.Core.Hosting
             {
                 if (_services.TryGetValue(documentId, out var service))
                 {
+                    // 关闭前补一次快照：那次落在 15 秒轮询窗口里的手动保存不能丢。
+                    service.SnapshotOnDetach();
                     service.Dispose();
                     _services.Remove(documentId);
+
+                    // 顺手丢掉状态缓存：文档重开时要从磁盘重新读，
+                    // 留着旧对象会让"关闭时的状态"和"下次打开读到的状态"脱节。
+                    _states.Remove(documentId);
                 }
             }
         }
 
         /// <summary>读取该文档的每文件状态；没有已保存的文档时返回 null。</summary>
+        /// <remarks>
+        /// 刻意**每次都从磁盘读**，不用 <c>_states</c> 缓存。
+        /// 这个方法被功能区的 getPressed 和设置窗口调用，频率很高；
+        /// 一旦它返回内存里的旧值，就会出现"明明存的是开，显示出来是关"。
+        /// <c>_states</c> 只留给写入路径和运行中的 AutoSaveService 用。
+        /// </remarks>
         public DocumentState? GetState(IHostAdapter? adapter)
         {
             var path = adapter?.FilePath;
@@ -98,15 +116,7 @@ namespace FileAutoSave.Core.Hosting
                 return null;
             }
 
-            lock (_gate)
-            {
-                if (_states.TryGetValue(path!, out var cached))
-                {
-                    return cached;
-                }
-            }
-
-            var state = Store.EnsureDocument(path!);
+            var state = Store.ReadState(path!) ?? Store.EnsureDocument(path!);
             lock (_gate)
             {
                 _states[path!] = state;
@@ -135,6 +145,9 @@ namespace FileAutoSave.Core.Hosting
                 state.AutoRecoverEnabled = autoRecover.Value;
             }
 
+            // 只要动过开关就记为"用户已表过态"，之后不再弹引导。
+            state.SwitchesConfigured = true;
+
             Store.SaveState(path!, state);
 
             lock (_gate)
@@ -149,7 +162,10 @@ namespace FileAutoSave.Core.Hosting
             return state;
         }
 
-        /// <summary>轻量心跳：让每个文档检查磁盘内容是否变化（捕捉手动保存）。</summary>
+        /// <summary>
+        /// 心跳：由宿主外壳每 <see cref="HeartbeatIntervalMs"/> 毫秒调一次。
+        /// 每个文档在这里检查"间隔是否到点"并顺手查一次磁盘变化。
+        /// </summary>
         public void Tick()
         {
             List<AutoSaveService> services;
@@ -160,7 +176,7 @@ namespace FileAutoSave.Core.Hosting
 
             foreach (var service in services)
             {
-                service.CheckForChanges();
+                service.Pump();
             }
         }
 
@@ -220,6 +236,8 @@ namespace FileAutoSave.Core.Hosting
                 _disposed = true;
                 foreach (var service in _services.Values)
                 {
+                    // 卸载时同样补一次：用户关掉 Office 直接退出也会走到这里。
+                    service.SnapshotOnDetach();
                     service.Dispose();
                 }
 

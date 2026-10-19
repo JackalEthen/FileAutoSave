@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Windows.Forms;
 using FileAutoSave.Core.Cloud;
 using FileAutoSave.Core.Settings;
 using FileAutoSave.Core.Snapshots;
@@ -14,8 +13,9 @@ namespace FileAutoSave.Core.Hosting
     ///   - 自动恢复：内容发生变化就记一份快照（含每次手动保存）。
     /// </summary>
     /// <remarks>
-    /// 必须在宿主的 UI 线程上构造：内部用 WinForms 定时器，Tick 在创建它的线程上触发，
-    /// 从而保证所有对 Office 对象的调用都发生在宿主主线程，避免跨线程访问 COM 崩溃。
+    /// 必须在宿主的 UI 线程上使用：所有对 Office 对象的调用都发生在宿主主线程，避免跨线程访问 COM 崩溃。
+    /// 本类**不持有定时器**——由宿主外壳的心跳（<see cref="Pump"/>）驱动，
+    /// 20 个打开的文档也只有 1 个定时器。
     /// </remarks>
     public sealed class AutoSaveService : IDisposable
     {
@@ -24,10 +24,13 @@ namespace FileAutoSave.Core.Hosting
         private readonly SnapshotStore _store;
         private ICloudUploadSink? _cloud;
         private readonly Action<string>? _notify;
-        private readonly Timer _timer;
 
         private DocumentState _state = null!;
         private DateTime _lastSeenWriteUtc;
+
+        /// <summary>下次该跑自动保存的时刻。按文档各自记录，到期时间天然错开。</summary>
+        private DateTime _nextDueUtc;
+
         private bool _disposed;
 
         public AutoSaveService(
@@ -45,8 +48,7 @@ namespace FileAutoSave.Core.Hosting
             _cloud = cloud;
             _notify = notify;
 
-            _timer = new Timer { Interval = (int)_settings.GetInterval().Value.TotalMilliseconds };
-            _timer.Tick += OnTick;
+            _nextDueUtc = DateTime.UtcNow + settings.GetInterval().Value;
 
             var path = adapter.FilePath;
             if (!string.IsNullOrEmpty(path) && File.Exists(path))
@@ -58,25 +60,37 @@ namespace FileAutoSave.Core.Hosting
 
         public DocumentState State => _state;
 
-        public void Start()
+        /// <summary>
+        /// 宿主心跳（外壳那个 15 秒定时器）：到点就跑一次自动保存，顺带查一次磁盘变化。
+        /// 早先这里是"每个文档一个定时器"，开十几个文档就十几个定时器同时醒；
+        /// 改成共享心跳 + 每文档记住下次到期时间后，定时器回到 1 个，
+        /// 而且到期时间依旧各自错开，不会齐步走。
+        /// </summary>
+        public void Pump()
         {
-            if (!_disposed)
+            if (_disposed)
             {
-                _timer.Start();
+                return;
             }
+
+            var now = DateTime.UtcNow;
+            if (now >= _nextDueUtc)
+            {
+                _nextDueUtc = now + _settings.GetInterval().Value;
+                RunOnce();
+            }
+
+            CheckForChanges();
         }
-
-        public void Stop() => _timer.Stop();
-
-        public void SetInterval(AutoSaveInterval interval) =>
-            _timer.Interval = (int)interval.Value.TotalMilliseconds;
 
         /// <summary>运行期改动全局设置或云目标时调用。</summary>
         public void Reconfigure(AddInSettings settings, ICloudUploadSink? cloud)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _cloud = cloud;
-            SetInterval(settings.GetInterval());
+
+            // 按新间隔重新起算，否则从 60 分钟改到 1 分钟要干等一整轮。
+            _nextDueUtc = DateTime.UtcNow + _settings.GetInterval().Value;
         }
 
         /// <summary>外部（功能区开关）改动该文档状态时调用。</summary>
@@ -100,12 +114,34 @@ namespace FileAutoSave.Core.Hosting
             }
 
             _disposed = true;
-            _timer.Stop();
-            _timer.Tick -= OnTick;
-            _timer.Dispose();
         }
 
-        private void OnTick(object? sender, EventArgs e) => RunOnce();
+        /// <summary>
+        /// 关闭文档 / 卸载加载项前补最后一次快照。
+        /// </summary>
+        /// <remarks>
+        /// 为什么必须有这一步：内容变化是靠 15 秒轮询发现的，而轮询只在文档还挂着时跑。
+        /// 用户在轮询窗口内手动保存、然后立刻关闭文档，那次保存就永远不会被发现——
+        /// 下次打开时基线时间已被重置成当前时间，改动凭空消失。
+        /// 快照内容直接来自磁盘文件，所以这里不需要碰 COM，卸载时也安全（投影故意跳过）。
+        /// 重复内容由 <see cref="SnapshotStore.Save"/> 的哈希去重挡掉。
+        /// </remarks>
+        public void SnapshotOnDetach()
+        {
+            try
+            {
+                if (_disposed || !_state.AutoRecoverEnabled)
+                {
+                    return;
+                }
+
+                Snapshot(withProjection: false);
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.LogException($"{_adapter.HostName}: 关闭前补快照", ex);
+            }
+        }
 
         /// <summary>间隔到点：自动保存覆盖原文件；自动恢复记快照。</summary>
         public void RunOnce()
@@ -186,7 +222,9 @@ namespace FileAutoSave.Core.Hosting
             }
         }
 
-        private SnapshotInfo? TrySnapshot()
+        private SnapshotInfo? TrySnapshot() => Snapshot(withProjection: true);
+
+        private SnapshotInfo? Snapshot(bool withProjection)
         {
             var path = _adapter.FilePath;
             if (!_adapter.IsSaved || string.IsNullOrEmpty(path) || !File.Exists(path))
@@ -196,7 +234,7 @@ namespace FileAutoSave.Core.Hosting
 
             _lastSeenWriteUtc = File.GetLastWriteTimeUtc(path);
 
-            var projection = SafeProjection();
+            var projection = withProjection ? SafeProjection() : null;
             var snapshot = _store.Save(path!, projection);
 
             if (snapshot == null)

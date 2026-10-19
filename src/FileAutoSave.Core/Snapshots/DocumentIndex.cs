@@ -20,6 +20,9 @@ namespace FileAutoSave.Core.Snapshots
         /// <summary>每文件状态：自动恢复。</summary>
         public bool AutoRecoverEnabled { get; set; }
 
+        /// <summary>每文件状态：用户是否已明确表过态（见 <see cref="DocumentState.SwitchesConfigured"/>）。</summary>
+        public bool SwitchesConfigured { get; set; }
+
         public List<SnapshotInfo> Snapshots { get; set; } = new List<SnapshotInfo>();
     }
 }

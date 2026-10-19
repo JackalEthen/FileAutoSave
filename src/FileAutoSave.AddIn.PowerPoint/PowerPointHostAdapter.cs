@@ -49,11 +49,19 @@ namespace FileAutoSave.AddIn.PowerPoint
             {
                 foreach (Slide slide in _presentation.Slides)
                 {
+                    if (builder.Length >= ProjectionBudget.MaxChars)
+                    {
+                        break;
+                    }
+
                     builder.Append("### 幻灯片 ").AppendLine(slide.SlideIndex.ToString());
 
                     foreach (Shape shape in slide.Shapes)
                     {
-                        AppendShapeText(builder, shape);
+                        if (!AppendShapeText(builder, shape))
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -61,10 +69,10 @@ namespace FileAutoSave.AddIn.PowerPoint
             {
             }
 
-            return builder.ToString();
+            return ProjectionBudget.Truncate(builder.ToString());
         }
 
-        private static void AppendShapeText(StringBuilder builder, Shape shape)
+        private static bool AppendShapeText(StringBuilder builder, Shape shape)
         {
             try
             {
@@ -77,6 +85,9 @@ namespace FileAutoSave.AddIn.PowerPoint
             catch (Exception)
             {
             }
+
+            // 逐形状遍历在超大演示文稿上很慢，超预算就让外层循环收工。
+            return builder.Length < ProjectionBudget.MaxChars;
         }
 
         public void RollbackFrom(string snapshotPath)

@@ -27,6 +27,8 @@ namespace FileAutoSave.Core.Snapshots
 
             public bool AutoRecoverEnabled { get; set; }
 
+            public bool SwitchesConfigured { get; set; }
+
             public DateTime UpdatedUtc { get; set; }
         }
 

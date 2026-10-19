@@ -49,6 +49,11 @@ namespace FileAutoSave.AddIn.Excel
             {
                 foreach (Worksheet sheet in _workbook.Worksheets)
                 {
+                    if (builder.Length >= ProjectionBudget.MaxChars)
+                    {
+                        break;
+                    }
+
                     builder.Append("### ").AppendLine(sheet.Name);
 
                     object? formula;
@@ -71,7 +76,7 @@ namespace FileAutoSave.AddIn.Excel
             {
             }
 
-            return builder.ToString();
+            return ProjectionBudget.Truncate(builder.ToString());
         }
 
         private static void AppendCells(StringBuilder builder, object[,] cells)
@@ -83,6 +88,12 @@ namespace FileAutoSave.AddIn.Excel
 
             for (var row = firstRow; row <= lastRow; row++)
             {
+                // 超大 UsedRange 会让这一趟跑很久；超预算就停，投影只用于显示差异。
+                if (builder.Length >= ProjectionBudget.MaxChars)
+                {
+                    return;
+                }
+
                 for (var column = firstColumn; column <= lastColumn; column++)
                 {
                     if (column > firstColumn)

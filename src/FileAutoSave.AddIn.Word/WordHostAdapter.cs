@@ -43,7 +43,7 @@ namespace FileAutoSave.AddIn.Word
         {
             try
             {
-                return _document.Content.Text ?? string.Empty;
+                return ProjectionBudget.Truncate(_document.Content.Text ?? string.Empty);
             }
             catch (Exception)
             {

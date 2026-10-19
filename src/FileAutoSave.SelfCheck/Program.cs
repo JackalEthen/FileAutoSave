@@ -24,7 +24,9 @@ namespace FileAutoSave.SelfCheck
                 CheckIntervalClamping();
                 CheckSettingsRoundTrip(workspace);
                 CheckSnapshotDedupAndRetention(workspace);
+                CheckSwitchesConfiguredRoundTrip(workspace);
                 CheckWebNetdiskLinks(workspace);
+                CheckLineDiff();
             }
             finally
             {
@@ -137,30 +139,88 @@ namespace FileAutoSave.SelfCheck
             Check(store.DirectoryName(sameName) != "copy.docx", "同名不同路径的文件不共用目录");
         }
 
+        private static void CheckSwitchesConfiguredRoundTrip(string workspace)
+        {
+            var versions = Path.Combine(workspace, "configured-versions");
+            var source = Path.Combine(workspace, "configured.docx");
+            File.WriteAllText(source, "v1");
+
+            var store = new SnapshotStore(versions, retention: 5);
+            var fresh = store.EnsureDocument(source);
+            var documentId = fresh.DocumentId;
+            Check(!fresh.SwitchesConfigured, "新文档默认未被标记为已配置");
+
+            fresh.AutoRecoverEnabled = true;
+            fresh.SwitchesConfigured = true;
+            store.SaveState(source, fresh);
+
+            var reloaded = store.EnsureDocument(source);
+            Check(reloaded.SwitchesConfigured, "已明确表态会被记住（不再弹引导）");
+            Check(reloaded.AutoRecoverEnabled, "开关状态一并记住");
+
+            // 另一份文档仍是"从未配置"，不该被上一个文档的设置污染
+            var other = Path.Combine(workspace, "other.docx");
+            File.WriteAllText(other, "v1");
+            Check(!store.EnsureDocument(other).SwitchesConfigured, "未配置的文档不受影响");
+
+            // 只读通道：显示路径靠它，必须认盘上的值，且绝不凭空造文档
+            fresh.AutoRecoverEnabled = false;
+            store.SaveState(source, fresh);
+            Check(store.ReadState(source)!.AutoRecoverEnabled == false, "只读通道读到关");
+            fresh.AutoSaveEnabled = true;
+            store.SaveState(source, fresh);
+            Check(store.ReadState(source)!.AutoSaveEnabled, "只读通道跟着写到开");
+            Check(store.ReadState(source)!.DocumentId == documentId, "只读通道认得同一个文档标识");
+
+            Check(store.ReadState(Path.Combine(workspace, "never-seen.docx")) == null, "只读通道对陌生文档返回 null 而不是造假数据");
+
+            var before = File.GetLastWriteTimeUtc(Path.Combine(versions, "configured.docx", "index.json"));
+            store.ReadState(source);
+            Check(File.GetLastWriteTimeUtc(Path.Combine(versions, "configured.docx", "index.json")) == before, "只读通道不写盘");
+        }
+
         private static void CheckWebNetdiskLinks(string workspace)
         {
             var defaults = WebNetdiskLink.Defaults();
-            Check(defaults.Count == 5, "默认内置 5 个网页网盘入口");
-            Check(defaults.All(l => l.IsUsable()), "默认入口全部可用");
-            Check(new AddInSettings().WebNetdisks.Count == 5, "新配置自带默认入口");
+            Check(defaults.Count == 5, "内置 5 个网页网盘入口");
+            Check(defaults.All(l => l.IsUsable()), "内置入口全部可用");
+            Check(defaults.Select(l => l.Url).Distinct().Count() == defaults.Count, "内置入口网址不重复");
 
             Check(!new WebNetdiskLink { Name = "坏网址", Url = "not a url" }.IsUsable(), "非法网址被判为不可用");
             Check(!new WebNetdiskLink { Name = "", Url = "https://a.com" }.IsUsable(), "空名称被判为不可用");
             Check(!new WebNetdiskLink { Name = "本地文件", Url = "file:///C:/x" }.IsUsable(), "非 http(s) 网址被判为不可用");
+        }
 
-            var store = new SettingsStore(Path.Combine(workspace, "netdisk.json"));
-            var settings = new AddInSettings();
-            settings.WebNetdisks.Add(new WebNetdiskLink { Name = "我的网盘", Url = "https://example.com" });
-            store.Save(settings);
+        private static void CheckLineDiff()
+        {
+            // 中间改一行：公共前后缀掐掉后只剩 1 删 1 增（首尾两行未变仍要输出）
+            var one = LineDiff.Compare("a\nb\nc", "a\nB\nc");
+            Check(one.Count == 4, $"改一行 → 输出 4 行（实得 {one.Count}）");
+            Check(one[0].Kind == DiffKind.Unchanged && one[0].Text == "a", "首行未变");
+            Check(one[1].Kind == DiffKind.Removed && one[1].Text == "b", "中间标删旧行");
+            Check(one[2].Kind == DiffKind.Added && one[2].Text == "B", "中间标增新行");
+            Check(one[3].Kind == DiffKind.Unchanged && one[3].Text == "c", "尾行未变");
 
-            var loaded = store.Load();
-            Check(loaded.WebNetdisks.Count == 6, "网页网盘设置往返");
-            Check(loaded.WebNetdisks.Any(l => l.Name == "我的网盘"), "自定义入口已持久化");
+            Check(LineDiff.Compare("a", "a").Count == 1, "完全相同 → 全是未变");
+            Check(LineDiff.Compare(null, "a").Any(l => l.Kind == DiffKind.Added), "旧版为空 → 全部新增");
+            Check(LineDiff.Compare("a", null).Any(l => l.Kind == DiffKind.Removed), "新版为空 → 全部删除");
 
-            // 用户主动清空后不应再被默认值灌回来
-            settings.WebNetdisks = new System.Collections.Generic.List<WebNetdiskLink>();
-            store.Save(settings);
-            Check(store.Load().WebNetdisks.Count == 0, "显式清空后保持为空");
+            // CRLF 与 LF 必须视为同一份内容
+            Check(LineDiff.Compare("a\r\nb", "a\nb").All(l => l.Kind == DiffKind.Unchanged), "CRLF/LF 视为相同");
+
+            // 中间块没超过上限时，LCS 会把改动的行对齐，中间不产生多余噪音
+            var aligned = LineDiff.Compare("1\n2\n3\n4", "1\nX\n3\nY\n4");
+            Check(aligned.Count(l => l.Kind == DiffKind.Unchanged) == 3, "LCS 对齐：3 行未变");
+            Check(aligned.Count(l => l.Kind == DiffKind.Added) == 2, "LCS 对齐：2 行新增");
+            Check(aligned.Count(l => l.Kind == DiffKind.Removed) == 1, "LCS 对齐：1 行删除");
+
+            // 整篇重写：中间块超上限，退化成整块删+增，且不能把机器卡死
+            var bigOld = string.Join("\n", Enumerable.Range(0, 900).Select(i => "old" + i));
+            var bigNew = string.Join("\n", Enumerable.Range(0, 900).Select(i => "new" + i));
+            var big = LineDiff.Compare(bigOld, bigNew);
+            Check(big.Count == 1800, $"超限退化为整块删增（实得 {big.Count}）");
+            Check(big.Count(l => l.Kind == DiffKind.Removed) == 900, "超限时旧块全标删");
+            Check(big.Count(l => l.Kind == DiffKind.Added) == 900, "超限时新块全标增");
         }
 
         private static void Check(bool condition, string name)

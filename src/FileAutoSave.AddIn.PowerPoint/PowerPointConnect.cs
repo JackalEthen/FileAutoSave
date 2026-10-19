@@ -23,20 +23,25 @@ namespace FileAutoSave.AddIn.PowerPoint
         /// <summary>侧边栏需要拿到共享运行时；由本类在启动/卸载时维护。</summary>
         internal static AddInRuntime? SharedRuntime { get; private set; }
 
-        private readonly HashSet<string> _attached = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Timer _rescanTimer = new Timer { Interval = 15000 };
+private readonly HashSet<string> _attached = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private string? _lastActiveId;
+        private readonly Timer _rescanTimer = new Timer { Interval = AddInRuntime.HeartbeatIntervalMs };
 
         private UiDispatcher? _dispatcher;
         private AddInRuntime? _runtime;
         private RibbonActions? _actions;
-        private IRibbonUI? _ribbon;
+        private NetOffice.OfficeApi.Native.IRibbonUI? _ribbon;
 
         public PowerPointConnect()
         {
             var location = typeof(PowerPointConnect).Assembly.Location;
             OnStartupComplete += Addin_OnStartupComplete;
             OnDisconnection += Addin_OnDisconnection;
-            _rescanTimer.Tick += (_, __) => Sync();
+            _rescanTimer.Tick += (_, __) =>
+            {
+                Sync();
+                CheckDocumentNotice();
+            };
         }
 
         public override string GetCustomUI(string RibbonID)
@@ -50,9 +55,22 @@ namespace FileAutoSave.AddIn.PowerPoint
             return picture;
         }
 
-        public void OnRibbonLoad(IRibbonUI ribbon)
+/// <param name="ribbon">
+        /// 必须是 <see cref="NetOffice.OfficeApi.Native.IRibbonUI"/>（接口）。
+        /// 同名空间下还有一个 <c>NetOffice.OfficeApi.IRibbonUI</c>，但那是**包装类**不是接口，
+        /// 参数用它 Office 会静默不调用 onLoad —— 于是 _ribbon 永远为 null，
+        /// 按钮停在第一次 getPressed 读到的假 false 上再也刷不掉。
+        /// </param>
+        public void OnRibbonLoad(NetOffice.OfficeApi.Native.IRibbonUI ribbon)
         {
             _ribbon = ribbon;
+
+            // Office 第一次调 getPressed 时 _actions 往往还没建好，返回的是
+            // "加载中"的假 false。功能区一就绪就无条件重画一次，把磁盘上的真值刷上去；
+            // 同时把 _lastActiveId 清掉，好让下一次 Sync 还能再刷一次。
+            _lastActiveId = null;
+            ribbon.InvalidateControl("btnAutoSave");
+            ribbon.InvalidateControl("btnAutoRecover");
         }
 
         public bool GetAutoSavePressed(IRibbonControl control)
@@ -172,14 +190,12 @@ namespace FileAutoSave.AddIn.PowerPoint
         private void Application_NewPresentationEvent(Presentation presentation)
         {
             Sync();
-            CheckDocumentNotice();
-        }
+            }
 
         private void Application_WindowActivateEvent(Presentation presentation, DocumentWindow window)
         {
             Sync();
-            CheckDocumentNotice();
-        }
+            }
 
         private void Application_PresentationBeforeSaveEvent(Presentation presentation, ref bool cancel)
         {
@@ -222,7 +238,8 @@ namespace FileAutoSave.AddIn.PowerPoint
                     _runtime.Attach(id, new PowerPointHostAdapter(presentation));
                 }
 
-                _runtime.Tick();
+_runtime.Tick();
+                RefreshToggles();
             }
             catch (Exception ex)
             {
@@ -230,10 +247,46 @@ namespace FileAutoSave.AddIn.PowerPoint
             }
         }
 
+        /// <summary>
+        /// 当前文档换了就把两个开关重画一遍，让它们显示的是**这个文档**存下来的状态。
+        /// </summary>
+        /// <remarks>
+        /// Office 会缓存 getPressed 的结果。之前只在用户自己点开关时 Invalidate，
+        /// 于是打开文档、切换文档、启动时恢复文档，功能区都还挂着上一个文档的状态——
+        /// 这正是"状态不同步"的根源。
+        /// 只在活动文档真的变了才重画，避免 15 秒心跳把功能区刷得一直闪。
+        /// </remarks>
+        private void RefreshToggles()
+        {
+            if (_ribbon == null)
+            {
+                return;
+            }
+
+            string? activeId;
+            try
+            {
+                activeId = IdOf(Application.ActivePresentation);
+            }
+            catch (Exception)
+            {
+                return;
+            }
+
+            if (activeId == null || string.Equals(activeId, _lastActiveId, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _lastActiveId = activeId;
+            _ribbon.InvalidateControl("btnAutoSave");
+            _ribbon.InvalidateControl("btnAutoRecover");
+        }
+
                 /// <summary>打开/新建/切换文档时的提示：未保存→先另存为；已保存→可开启开关。</summary>
         private void CheckDocumentNotice()
         {
-            if (_actions == null)
+if (_actions == null || _runtime == null)
             {
                 return;
             }
@@ -249,6 +302,12 @@ namespace FileAutoSave.AddIn.PowerPoint
                 var adapter = new PowerPointHostAdapter(presentation);
                 if (adapter.IsSaved)
                 {
+                    // 用户已经就这个文档表过态（开或关都算）就不再打扰。
+                    if (_runtime.GetState(adapter)?.SwitchesConfigured == true)
+                    {
+                        return;
+                    }
+
                     _actions.NotifyDocumentOpened(adapter.FilePath!);
                 }
                 else

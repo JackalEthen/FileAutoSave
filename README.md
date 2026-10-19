@@ -55,7 +55,7 @@ Five buttons on the ribbon:
 - **Auto-recover** (toggle) — record rollbackable snapshots
 - **Version history** — open the side pane
 - **Backup to netdisk** — open the netdisk site and locate the latest snapshot, then drag it up
-- **Settings** — interval / snapshot root / retention / cloud / web netdisks
+- **Settings** — interval / snapshot root / retention / cloud
 
 Both switches **default to off** and their state is **remembered per document**:
 
@@ -78,7 +78,7 @@ Auto-recover and version history are **already fully local** — they work with 
 
 **About "Backup to netdisk"**: it is only a shortcut to the official site. Quark / Xunlei / Baidu **publish no API**, and emulating their private endpoints both violates their terms and breaks whenever they change them — so we don't. The cost is that it is **off-site backup only**: with no file listing available there is no cloud version history and no cloud rollback. History always stays local.
 
-Five entries (Quark, Xunlei, Baidu, 189, Aliyun Drive) ship by default; add or remove any of them under **Settings → Web netdisks**.
+Five entries (Quark, Xunlei, Baidu, 189, Aliyun Drive) are **built in** — one click on the ribbon and pick one; there is nothing to configure.
 
 ## Snapshot layout
 
@@ -125,7 +125,7 @@ src/
 ├─ FileAutoSave.AddIn.Word/      three thin shims: Word
 ├─ FileAutoSave.AddIn.Excel/                       Excel
 ├─ FileAutoSave.AddIn.PowerPoint/                  PowerPoint
-└─ FileAutoSave.SelfCheck/       framework-free self-check (24 assertions)
+└─ FileAutoSave.SelfCheck/       framework-free self-check (44 assertions)
 ```
 
 Design decisions live in [`docs/adr/`](docs/adr/); the domain glossary is [`CONTEXT.md`](CONTEXT.md).
@@ -135,7 +135,8 @@ Design decisions live in [`docs/adr/`](docs/adr/); the domain glossary is [`CONT
 - **No WPS support** (Microsoft Office only).
 - **Renames re-attach, copies start fresh**: a rename (the old path is gone) adopts the same history and renames its folder; Save As / a file copy (the old path still exists) counts as a new file. A copy is **byte-identical** to its original, so no content hash can tell them apart — "is the old path still there" is the only reliable discriminator.
 - **In-place replacement is not detected**: overwriting a path with a completely different document is indistinguishable on disk from "the same file edited elsewhere and put back", and is treated as the same document.
-- **Auto-recover with auto-save off can lag up to ~15 s**: Word has no "after save" event, so manual saves are picked up by content-change detection.
+- **Auto-recover with auto-save off can lag up to ~15 s**: Word has no "after save" event, so manual saves are picked up by content-change detection. Closing a document and unloading the add-in both flush one last snapshot, so a manual save inside the polling window is not lost.
+- **Text projection is truncated on very large documents**: the projection is produced by walking the document over COM on the UI thread and is cut off past 200,000 characters (Excel / PowerPoint stop walking early). The projection only feeds the diff display — never rollback — so truncating it costs no recovery capability.
 - **Not code-signed**: SmartScreen will warn on install.
 - Snapshot root and retention take effect **at startup**; restart the host after changing them.
 
