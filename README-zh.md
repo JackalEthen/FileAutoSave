@@ -2,7 +2,7 @@
 
 > 给 Word / Excel / PowerPoint 补上**可自定义间隔**的自动保存、**本地快照回滚**与**云端版本历史**。
 
-![version](https://img.shields.io/badge/version-0.2.1-2ea44f?style=flat-square)
+![version](https://img.shields.io/badge/version-0.2.2-2ea44f?style=flat-square)
 ![license](https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4?style=flat-square)
@@ -125,7 +125,7 @@ src/
 ├─ FileAutoSave.AddIn.Word/      三个薄外壳：Word
 ├─ FileAutoSave.AddIn.Excel/                  Excel
 ├─ FileAutoSave.AddIn.PowerPoint/             PowerPoint
-└─ FileAutoSave.SelfCheck/       无框架自检（44 项）
+└─ FileAutoSave.SelfCheck/       无框架自检（54 项）
 ```
 
 设计决策记录在 [`docs/adr/`](docs/adr/)，领域术语在 [`CONTEXT.md`](CONTEXT.md)。

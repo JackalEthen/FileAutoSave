@@ -2,7 +2,7 @@
 
 > Auto-save with a **customizable interval**, **local snapshot rollback**, and **cloud version history** for Word, Excel and PowerPoint.
 
-![version](https://img.shields.io/badge/version-0.2.1-2ea44f?style=flat-square)
+![version](https://img.shields.io/badge/version-0.2.2-2ea44f?style=flat-square)
 ![license](https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4?style=flat-square)
@@ -125,7 +125,7 @@ src/
 ├─ FileAutoSave.AddIn.Word/      three thin shims: Word
 ├─ FileAutoSave.AddIn.Excel/                       Excel
 ├─ FileAutoSave.AddIn.PowerPoint/                  PowerPoint
-└─ FileAutoSave.SelfCheck/       framework-free self-check (44 assertions)
+└─ FileAutoSave.SelfCheck/       framework-free self-check (54 assertions)
 ```
 
 Design decisions live in [`docs/adr/`](docs/adr/); the domain glossary is [`CONTEXT.md`](CONTEXT.md).

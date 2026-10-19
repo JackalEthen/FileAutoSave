@@ -1,6 +1,6 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="FileAutoSave" Manufacturer="FileAutoSave" Version="0.2.1"
+  <Package Name="FileAutoSave" Manufacturer="FileAutoSave" Version="0.2.2"
            UpgradeCode="8D2C4B10-7F3A-4E21-9B77-1A2C3D4E5F60" Scope="perMachine" Codepage="65001">
 
     <SummaryInformation Description="文件自动保存加载项（Word / Excel / PowerPoint）" />
